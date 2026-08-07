@@ -1,1 +1,14 @@
-This is the content of sample text file 1.
+How AI Works?
+AI relies on a layered architecture of technologies to process data and simulate cognitive tasks:
+Machine Learning (ML): Algorithms train on data to automatically improve performance without explicit programming.
+Deep Learning: A subset of ML that uses multi-layered artificial neural networks to mimic the human brain.
+Natural Language Processing (NLP): The technology allowing machines to read, understand, and generate human language.
+Computer Vision: Systems analyze visual inputs from cameras or sensors to recognize objects and context.
+
+Core Classifications of AI:
+AI is primarily categorized by its capabilities and developmental stages:
+Narrow AI (Weak AI): Systems built to excel at a singular, specific task. This is the only type of AI that currently exists.
+General AI (AGI): A theoretical form of AI matching human-level adaptability and intellect across multiple domains.
+Super AI (ASI): A hypothetical future intelligence that vastly surpasses all human cognitive capabilities.
+
+
