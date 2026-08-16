@@ -11,5 +11,4 @@ langchain-groq
 python-dotenv
 google-genai
 typesense
-langchain-openai
 langgraph
