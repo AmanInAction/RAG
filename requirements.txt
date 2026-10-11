@@ -6,7 +6,7 @@ pypdf
 pymupdf
 sentence-transformers
 faiss-cpu
-chromadb
+beautifulsoup4
 langchain-groq
 python-dotenv
 google-genai

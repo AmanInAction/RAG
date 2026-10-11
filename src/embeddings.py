@@ -1,20 +1,29 @@
+import os
 from typing import Any, List
 
 import numpy as np
+from dotenv import load_dotenv
+from langchain_core.embeddings import Embeddings
 from sentence_transformers import SentenceTransformer
 
 from .config import EMBEDDING_MODEL_NAME
 
 
-class EmbeddingManager:
+class EmbeddingManager(Embeddings):
     """Load a sentence-transformer model and generate embeddings in batches."""
 
-    def __init__(self, model_name: str = EMBEDDING_MODEL_NAME) -> None:
+    def __init__(self, model_name: str | None = None) -> None:
+        load_dotenv()
+        model_name = model_name or os.getenv("EMBEDDING_MODEL_NAME", EMBEDDING_MODEL_NAME)
         self.model_name = model_name
         self.model = SentenceTransformer(model_name)
+        embedding_dimension = self.model.get_embedding_dimension()
+        if embedding_dimension is None:
+            raise RuntimeError(f"Embedding model {model_name} reported no dimension.")
+        self.embedding_dimension = embedding_dimension
         print(
             f"Model {model_name} loaded successfully. "
-            f"Embedding dimension: {self.model.get_embedding_dimension()}"
+            f"Embedding dimension: {self.embedding_dimension}"
         )
 
     @staticmethod
@@ -43,7 +52,7 @@ class EmbeddingManager:
                     clean_texts.append(text.strip())
 
         if not clean_texts:
-            return np.empty((0, self.model.get_embedding_dimension()))
+            return np.empty((0, self.embedding_dimension))
 
         batches = []
         for start in range(0, len(clean_texts), 64):
@@ -55,3 +64,9 @@ class EmbeddingManager:
                 )
             )
         return np.vstack(batches)
+
+    def embed_documents(self, texts: List[str]) -> List[List[float]]:
+        return self.generate_embeddings(texts).tolist()
+
+    def embed_query(self, text: str) -> List[float]:
+        return self.generate_embeddings([text])[0].tolist()

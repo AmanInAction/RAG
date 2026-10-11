@@ -18,26 +18,17 @@ class RAGRetriever:
         score_threshold: float = 0.0,
     ) -> List[Dict[str, Any]]:
         query_embedding = self.embedding_manager.generate_embeddings([query])[0]
-        results = self.vector_store.collection.query(
-            query_embeddings=[query_embedding.tolist()],
-            n_results=top_k,
-        )
-
         retrieved_docs = []
-        documents = (results.get("documents") or [[]])[0]
-        metadatas = (results.get("metadatas") or [[]])[0]
-        distances = (results.get("distances") or [[]])[0]
-        ids = (results.get("ids") or [[]])[0]
-        for rank, (doc_id, document, metadata, distance) in enumerate(
-            zip(ids, documents, metadatas, distances), start=1
-        ):
+        results = self.vector_store.search(query_embedding, top_k)
+        for rank, item in enumerate(results, start=1):
+            distance = item["distance"]
             similarity_score = 1 - distance
             if similarity_score >= score_threshold:
                 retrieved_docs.append(
                     {
-                        "id": doc_id,
-                        "content": document,
-                        "metadata": metadata,
+                        "id": item["id"],
+                        "content": item["content"],
+                        "metadata": item["metadata"],
                         "similarity_score": similarity_score,
                         "distance": distance,
                         "rank": rank,

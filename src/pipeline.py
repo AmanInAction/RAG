@@ -25,6 +25,16 @@ Answer:
 """
 
 
+def _generate_text(llm: Any, prompt: str) -> str:
+    if hasattr(llm, "generate"):
+        return llm.generate(prompt)
+    response = llm.interactions.create(
+        model=GEMINI_MODEL_NAME,
+        input=prompt,
+    )
+    return response.output_text
+
+
 def simple_rag(query: str, retriever: RAGRetriever, llm: Any, top_k: int = 3) -> str | None:
     """Retrieve context and return an LLM answer."""
     results = retriever.retrieval(query, top_k=top_k)
@@ -35,11 +45,7 @@ def simple_rag(query: str, retriever: RAGRetriever, llm: Any, top_k: int = 3) ->
         f"Document {item['rank']} (Score: {item['similarity_score']:.4f}):\n{item['content']}"
         for item in results
     )
-    response = llm.interactions.create(
-        model=GEMINI_MODEL_NAME,
-        input=_build_prompt(context, query),
-    )
-    return response.output_text
+    return _generate_text(llm, _build_prompt(context, query))
 
 
 def rag_advanced(
@@ -56,12 +62,9 @@ def rag_advanced(
         return {"answer": NO_CONTEXT_MESSAGE, "sources": [], "confidence": 0.0, "context": ""}
 
     context = "\n\n".join(item["content"] for item in results)
-    response = llm.interactions.create(
-        model=GEMINI_MODEL_NAME,
-        input=_build_prompt(context, query),
-    )
+    answer = _generate_text(llm, _build_prompt(context, query))
     output: Dict[str, Any] = {
-        "answer": response.output_text,
+        "answer": answer,
         "sources": [
             {
                 "source": item["metadata"].get("source_file", item["metadata"].get("source", "unknown")),
