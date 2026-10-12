@@ -1,0 +1,8 @@
+{
+  "name": "RAG SaaS",
+  "description": "Scalable RAG platform with document ingestion, vector retrieval, and LLM streaming.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
