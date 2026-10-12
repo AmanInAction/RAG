@@ -1,145 +1,122 @@
-# Local Retrieval-Augmented Generation
+# RAG SaaS Platform
 
-This project is a small, modular RAG application. It loads local documents or web pages, creates vector embeddings, retrieves relevant chunks, and generates answers grounded in retrieved context. Ingestion formats and the embedding model, chunking strategy, vector store, and LLM provider can be configured.
+A high-performance, modular Retrieval-Augmented Generation (RAG) platform with a **FastAPI backend** and upcoming **Next.js App Router frontend**. It enables dynamic document ingestion (PDF, Markdown, Text, JSON), web page scraping, semantic retrieval via **Typesense** or local **FAISS**, and streaming token responses via **Google Gemini** or **Groq**.
 
-The code began as an exploratory notebook and is now organized as reusable Python modules. The current entry point is `main.py`.
+---
 
-## Current Workflow
-
-1. Read `.txt`, Markdown, JSON, and PDF documents from `data/text_files/`; optionally fetch URLs listed in `data/web_urls.txt`.
-2. Split documents into overlapping chunks with the configured recursive or character splitter.
-3. Generate embeddings locally with the configured Sentence Transformers model (default: `all-MiniLM-L6-v2`).
-4. Store chunks and embeddings in the configured Typesense or local FAISS vector store.
-5. Retrieve the highest-scoring chunks for a query.
-6. Send the retrieved context to the configured Gemini or Groq model with instructions to avoid unsupported answers.
-
-The default command runs one example question from `main.py` and prints the answer, source metadata, and confidence score. Typesense collections are created automatically when needed. Both vector stores use deterministic document IDs to avoid duplicating identical chunks on repeated ingestion.
-
-## Project Structure
+## Architecture Overview
 
 ```text
 .
-├── data/
-│   └── text_files/       # Local source documents
-├── data/web_urls.txt     # Optional web pages, one URL per line
-├── main.py               # Application entry point and pipeline wiring
-├── src/
-│   ├── chunking.py       # Configurable document splitting
-│   ├── config.py         # Paths and provider defaults
-│   ├── embeddings.py     # Configurable Sentence Transformers embeddings
-│   ├── loaders.py        # Common local-file and web-page loader interface
-│   ├── llm.py            # Gemini and Groq provider selection
-│   ├── pipeline.py       # Prompting and RAG functions
-│   ├── retriever.py      # Similarity search and score filtering
-│   └── vector_store.py   # Typesense and FAISS backends
-├── requirements.txt      # Pip dependency list
-└── pyproject.toml        # Project metadata and dependency configuration
+├── api/                      # FastAPI Backend Server
+│   ├── main.py               # Lifespan singletons, CORS, server entrypoint
+│   ├── routes/               # REST & SSE routers
+│   │   ├── chat.py           # /api/chat/query & /api/chat/stream (SSE)
+│   │   ├── documents.py      # /api/documents (upload, url, list, delete, reindex)
+│   │   └── system.py         # /api/config, /api/health, /api/vector-store/stats
+│   ├── schemas.py            # Pydantic request & response models
+│   └── services.py           # RAGService singleton & async workers
+├── src/                      # Core RAG Engine
+│   ├── chunking.py           # Recursive & Character chunk splitters
+│   ├── config.py             # Default paths and model settings
+│   ├── embeddings.py         # SentenceTransformer (all-MiniLM-L6-v2)
+│   ├── llm.py                # Gemini & Groq multi-provider + token streaming
+│   ├── loaders.py            # Local file & web loader interfaces
+│   ├── pipeline.py           # Prompting, advanced RAG & streaming generator
+│   ├── retriever.py          # Vector similarity search & thresholding
+│   └── vector_store.py       # Typesense and local FAISS vector backends
+├── tests/                    # Automated Test Suite
+│   ├── test_api.py           # FastAPI integration tests
+│   └── test_configurable_pipeline.py # Unit tests
+├── pyproject.toml            # Project dependencies & metadata (uv managed)
+├── requirements.txt          # Pip requirements sync
+└── development-phases.md     # Phased development roadmap
 ```
 
-## Setup
+---
 
-The project requires Python 3.13 or newer.
+## Backend API Endpoints
 
+The FastAPI server runs on `http://localhost:8000` with interactive Swagger docs at `/docs`.
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/chat/stream` | Server-Sent Events (SSE) streaming LLM answer with immediate citation metadata. |
+| `POST` | `/api/chat/query` | Standard Q&A returning answer, sources, confidence, and context. |
+| `POST` | `/api/documents/upload` | Upload `.pdf`, `.txt`, `.md`, or `.json` file for dynamic ingestion. |
+| `POST` | `/api/documents/url` | Ingest and index content from a public web URL. |
+| `GET` | `/api/documents` | List all ingested documents with chunk counts and sample snippets. |
+| `DELETE` | `/api/documents/{id}` | Delete a document and its indexed chunks. |
+| `POST` | `/api/documents/reindex` | Re-index all documents in the default directory. |
+| `GET` | `/api/vector-store/stats` | View active collection stats, vector dimensions, and chunk count. |
+| `DELETE` | `/api/vector-store/clear` | Purge all indexed vectors. |
+| `GET` | `/api/config` | View active provider, embedding model, and chunk parameters. |
+| `GET` | `/api/health` | Health check probe. |
+
+---
+
+## Setup & Quickstart
+
+### Prerequisites
+- Python 3.13+
+- [`uv`](https://docs.astral.sh/uv/) package manager (or standard virtualenv)
+- Node.js 18+ (for upcoming frontend)
+
+### Installation
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+# Clone the repository
+git clone <repo-url>
+cd RAG
+
+# Install dependencies with uv
+uv sync
 ```
 
-Create a local `.env` file in the project root. The defaults below use Typesense, Gemini, recursive chunking, and the local MiniLM embedding model:
+### Environment Configuration
+Create a `.env` file in the root directory:
+```env
+# LLM Providers (Gemini or Groq)
+LLM_PROVIDER=gemini
+GEMINI_API_KEY=your-gemini-api-key
+GEMINI_MODEL_NAME=gemini-3.1-flash-lite
 
-```text
-GEMINI_API_KEY=your-api-key
+# Optional Groq configuration
+GROQ_API_KEY=your-groq-api-key
+GROQ_MODEL_NAME=llama-3.3-70b-versatile
+
+# Vector Store (typesense or faiss)
+VECTOR_STORE_BACKEND=typesense
 TYPESENSE_HOST=your-typesense-host
 TYPESENSE_PORT=443
 TYPESENSE_ADMIN_KEY=your-typesense-admin-key
-VECTOR_STORE_BACKEND=typesense
 TYPESENSE_COLLECTION_NAME=document_embeddings
-LLM_PROVIDER=gemini
-GEMINI_MODEL_NAME=gemini-3.1-flash-lite
+
+# Chunking & Embeddings
 EMBEDDING_MODEL_NAME=all-MiniLM-L6-v2
-CHUNKING_STRATEGY=recursive
 CHUNK_SIZE=1000
 CHUNK_OVERLAP=200
-# Optional when using LLM_PROVIDER=groq
-GROQ_API_KEY=your-groq-api-key
 ```
 
-Typesense settings are needed only when `VECTOR_STORE_BACKEND=typesense`; the host should not include a protocol prefix, and the application connects over HTTPS. Do not commit `.env` or API keys to source control. The first run may download the embedding model, which can take a few minutes.
+---
 
-For a local vector index, set `VECTOR_STORE_BACKEND=faiss`. It is saved under `data/faiss_store/` by default (override with `FAISS_DIRECTORY`). For Groq, set `LLM_PROVIDER=groq`, provide `GROQ_API_KEY`, and optionally set `GROQ_MODEL_NAME` (default: `llama-3.3-70b-versatile`). To change the embedding model, set `EMBEDDING_MODEL_NAME` to a Sentence Transformers model ID. Use a new `TYPESENSE_COLLECTION_NAME` or `FAISS_DIRECTORY` when switching embedding models; Typesense filters documents by model and FAISS rejects a directory saved for a different model.
+## Running the Application
 
-Place `.txt`, `.md`, `.markdown`, `.json`, and `.pdf` files in `data/text_files/`. JSON documents are serialized as readable, indented JSON before chunking. To ingest static web pages, create `data/web_urls.txt` with one `http://` or `https://` URL per line; blank lines and lines beginning with `#` are ignored. Web content is fetched at runtime and requires network access.
-
-## Run
-
-Run the application from the project root:
-
+### 1. Start the FastAPI Backend Server
 ```powershell
-python main.py
+uv run uvicorn api.main:app --host 127.0.0.1 --port 8000 --reload
 ```
+Interactive API docs are available at [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs).
 
-Add or replace supported files in `data/text_files/` or URLs in `data/web_urls.txt` before running. The example query is in `main.py`; provider and chunking settings can be set in `.env`.
-
-Run the automated tests with:
-
+### 2. Run Automated Tests
 ```powershell
-python -m unittest discover -s tests
+uv run python -m unittest tests/test_api.py
 ```
 
-## Module Usage
+---
 
-The components can be used independently for debugging or experiments:
+## Project Status
 
-```python
-from src.chunking import split_documents
-from src.config import TEXTS_DIRECTORY, WEB_URLS_FILE
-from src.embeddings import EmbeddingManager
-from src.loaders import load_documents
-from src.llm import LLMProvider
-from src.retriever import RAGRetriever
-from src.vector_store import VectorStore
-
-documents = load_documents(TEXTS_DIRECTORY, WEB_URLS_FILE)
-chunks = split_documents(documents)
-embedding_manager = EmbeddingManager()
-store = VectorStore(
-    embedding_manager.embedding_dimension,
-    embedding_model_name=embedding_manager.model_name,
-)
-store.add_documents(chunks, embedding_manager.generate_embeddings(chunks))
-retriever = RAGRetriever(store, embedding_manager)
-results = retriever.retrieval("Ask a question about the documents")
-llm = LLMProvider()
-```
-
-For a complete flow, use `simple_rag` or `rag_advanced` from `src.pipeline` with the configured LLM provider.
-
-## Current Limitations
-
-- The example query is hard-coded in `main.py`.
-- Ingestion and embedding run every time the application starts.
-- Changed or removed source documents are not automatically pruned from a vector store; use a clean index when source documents change substantially.
-- Web ingestion handles static HTML pages, not JavaScript-rendered pages or authenticated sites.
-- There is no web interface, authentication, or retrieval evaluation dataset yet.
-
-## Future Scope
-
-### Near Term
-
-- Accept questions and ingestion options from a CLI instead of hard-coding them.
-- Add an explicit re-index command that can prune chunks from changed or removed source documents.
-- Expand unit tests to cover retrieval thresholds and prompt construction.
-- Improve structured logging and error messages for missing files, models, and API configuration.
-
-### Product Features
-
-- Add conversation history, streaming responses, citations, and source previews.
-- Build a lightweight web UI for document management and question answering.
-
-### Reliability And Scale
-
-- Add retrieval evaluation with a labeled question-and-answer dataset.
-- Measure answer faithfulness, context relevance, latency, and token cost.
-- Add metadata filters, hybrid keyword-plus-vector search, reranking, and configurable caching.
-- Define backup, retention, and secret-management requirements for hosted Typesense and Gemini credentials.
+- **Phase 1: Core Engine Refactoring & Consolidation**: Completed
+- **Phase 2: FastAPI Backend Engine**: Completed
+- **Phase 3: Next.js (App Router) Frontend (`frontend/`)**: Up Next
+- **Phase 4: SaaS Hardening & Production Polish**: Planned

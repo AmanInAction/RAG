@@ -79,3 +79,55 @@ def rag_advanced(
     if return_context:
         output["context"] = context
     return output
+
+
+def rag_stream(
+    query: str,
+    retriever: RAGRetriever,
+    llm: Any,
+    top_k: int = 5,
+    min_score: float = 0.2,
+) -> tuple[Dict[str, Any], Any]:
+    """Retrieve context, format metadata, and return (metadata_dict, token_iterator)."""
+    results = retriever.retrieval(query, top_k=top_k, score_threshold=min_score)
+    if not results:
+        metadata = {
+            "sources": [],
+            "confidence": 0.0,
+            "context": "",
+            "has_context": False,
+        }
+
+        def empty_gen():
+            yield NO_CONTEXT_MESSAGE
+
+        return metadata, empty_gen()
+
+    context = "\n\n".join(item["content"] for item in results)
+    prompt = _build_prompt(context, query)
+    metadata = {
+        "sources": [
+            {
+                "source": item["metadata"].get(
+                    "source_file", item["metadata"].get("source", "unknown")
+                ),
+                "page": item["metadata"].get("page", "unknown"),
+                "score": round(item["similarity_score"], 4),
+                "preview": item["content"][:220] + "...",
+            }
+            for item in results
+        ],
+        "confidence": round(max(item["similarity_score"] for item in results), 4),
+        "context": context,
+        "has_context": True,
+    }
+
+    def token_gen():
+        if hasattr(llm, "stream_generate"):
+            for token in llm.stream_generate(prompt):
+                yield token
+        else:
+            yield _generate_text(llm, prompt)
+
+    return metadata, token_gen()
+

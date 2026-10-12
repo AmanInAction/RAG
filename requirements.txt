@@ -13,3 +13,7 @@ google-genai
 typesense
 langgraph
 dotenv
+fastapi
+uvicorn[standard]
+python-multipart
+sse-starlette

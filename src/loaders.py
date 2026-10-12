@@ -107,6 +107,44 @@ def load_documents(
     return [document for loader in loaders for document in loader.load()]
 
 
+def load_single_file(file_path: Path, filename: str | None = None) -> List[Document]:
+    """Load a single file (pdf, txt, md, json) with normalized metadata."""
+    file_path = Path(file_path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"File not found: {file_path}")
+    docs = _load_file(file_path)
+    clean_name = filename or file_path.name
+    for doc in docs:
+        doc.metadata["source_file"] = clean_name
+        doc.metadata["source"] = clean_name
+        doc.metadata["filename"] = clean_name
+        doc.metadata["format"] = file_path.suffix.lstrip(".").lower() or "text"
+    return docs
+
+
+def load_single_url(url: str) -> List[Document]:
+    """Load content from a single web URL."""
+    url = url.strip()
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
+        raise ValueError(f"Invalid web page URL: {url}")
+    from langchain_community.document_loaders import WebBaseLoader
+
+    loader = WebBaseLoader(
+        web_paths=[url],
+        requests_kwargs={"timeout": 20},
+        continue_on_failure=False,
+        raise_for_status=True,
+    )
+    docs = loader.load()
+    for doc in docs:
+        doc.metadata["source_file"] = url
+        doc.metadata["source"] = url
+        doc.metadata["format"] = "web"
+    return docs
+
+
+
 def create_sample_texts(output_directory: Path) -> None:
     """Create the sample input used by the original notebook."""
     output_directory.mkdir(parents=True, exist_ok=True)

@@ -178,6 +178,92 @@ class TypesenseVectorStore:
             for hit in hits
         ]
 
+    def list_documents(self) -> List[Dict[str, Any]]:
+        """List distinct ingested documents with their chunk counts and sample snippets."""
+        try:
+            response = self.client.multi_search.perform(
+                {
+                    "searches": [
+                        {
+                            "collection": self.collection_name,
+                            "q": "*",
+                            "per_page": 250,
+                            "exclude_fields": "embedding",
+                        }
+                    ]
+                },
+                {},
+            )
+            hits = response["results"][0].get("hits") or []
+            docs_by_source: Dict[str, Dict[str, Any]] = {}
+            for hit in hits:
+                doc = hit.get("document", {})
+                metadata = doc.get("metadata") or {}
+                source = metadata.get("source_file") or metadata.get("source") or doc.get("id")
+                if not source:
+                    continue
+                source_str = str(source)
+                if source_str not in docs_by_source:
+                    docs_by_source[source_str] = {
+                        "source": source_str,
+                        "source_name": Path(source_str).name if ("/" in source_str or "\\" in source_str) else source_str,
+                        "chunks_count": 0,
+                        "format": metadata.get("format", Path(source_str).suffix.replace(".", "") or "text"),
+                        "sample_content": doc.get("content", "")[:160] + "...",
+                    }
+                docs_by_source[source_str]["chunks_count"] += 1
+            return list(docs_by_source.values())
+        except Exception:
+            return []
+
+    def delete_document(self, source_or_id: str) -> int:
+        """Delete chunks matching a document ID or source path."""
+        deleted = 0
+        try:
+            self.collection.documents[source_or_id].delete()
+            deleted += 1
+        except Exception:
+            pass
+        try:
+            res = self.collection.documents.delete({
+                "filter_by": f"metadata.source_file:={source_or_id}"
+            })
+            deleted += int(res.get("num_deleted", 0))
+        except Exception:
+            pass
+        if deleted == 0:
+            try:
+                res = self.collection.documents.delete({
+                    "filter_by": f"metadata.source:={source_or_id}"
+                })
+                deleted += int(res.get("num_deleted", 0))
+            except Exception:
+                pass
+        return deleted
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return collection-level chunk and index stats."""
+        try:
+            schema = self.collection.retrieve()
+            total_docs = schema.get("num_documents", 0)
+        except Exception:
+            total_docs = 0
+        return {
+            "backend": "typesense",
+            "collection_name": self.collection_name,
+            "total_chunks": total_docs,
+            "embedding_dimension": self.embedding_dimension,
+            "embedding_model_id": self.embedding_model_id,
+        }
+
+    def clear(self) -> None:
+        """Purge all documents from the collection."""
+        try:
+            self.collection.documents.delete({"filter_by": "embedding_model:!='' "})
+        except Exception:
+            pass
+
+
 
 class FaissVectorStore:
     """Persistent local FAISS vector store using normalized cosine similarity."""
@@ -339,6 +425,66 @@ class FaissVectorStore:
         index_temporary.replace(self.index_file)
         documents_temporary.replace(self.documents_file)
 
+    def list_documents(self) -> List[Dict[str, Any]]:
+        """List distinct ingested documents with their chunk counts and sample snippets."""
+        docs_by_source: Dict[str, Dict[str, Any]] = {}
+        for doc_id, doc in self.documents_by_id.items():
+            metadata = doc.get("metadata") or {}
+            source = metadata.get("source_file") or metadata.get("source") or doc_id
+            source_str = str(source)
+            if source_str not in docs_by_source:
+                docs_by_source[source_str] = {
+                    "source": source_str,
+                    "source_name": Path(source_str).name if ("/" in source_str or "\\" in source_str) else source_str,
+                    "chunks_count": 0,
+                    "format": metadata.get("format", Path(source_str).suffix.replace(".", "") or "text"),
+                    "sample_content": doc.get("content", "")[:160] + "...",
+                }
+            docs_by_source[source_str]["chunks_count"] += 1
+        return list(docs_by_source.values())
+
+    def delete_document(self, source_or_id: str) -> int:
+        """Delete chunks matching a document ID or source path."""
+        to_delete = []
+        for doc_id, doc in self.documents_by_id.items():
+            metadata = doc.get("metadata") or {}
+            source = metadata.get("source_file") or metadata.get("source") or doc_id
+            if str(source) == source_or_id or doc_id == source_or_id:
+                to_delete.append(doc_id)
+        if not to_delete:
+            return 0
+        vector_ids = [
+            self.vector_ids_by_document_id[d_id]
+            for d_id in to_delete
+            if d_id in self.vector_ids_by_document_id
+        ]
+        if vector_ids:
+            self.index.remove_ids(np.asarray(vector_ids, dtype=np.int64))
+        for d_id in to_delete:
+            self.documents_by_id.pop(d_id, None)
+            self.vector_ids_by_document_id.pop(d_id, None)
+        self._persist()
+        return len(to_delete)
+
+    def get_stats(self) -> Dict[str, Any]:
+        """Return local index stats."""
+        return {
+            "backend": "faiss",
+            "directory": str(self.directory),
+            "total_chunks": len(self.documents_by_id),
+            "embedding_dimension": self.embedding_dimension,
+            "embedding_model_id": self.embedding_model_id,
+        }
+
+    def clear(self) -> None:
+        """Purge all documents from the local FAISS index."""
+        import faiss
+
+        self.index = faiss.IndexIDMap2(faiss.IndexFlatIP(self.embedding_dimension))
+        self.documents_by_id.clear()
+        self.vector_ids_by_document_id.clear()
+        self._persist()
+
 
 class VectorStore:
     """Configured vector-store facade shared by Typesense and FAISS backends."""
@@ -389,6 +535,26 @@ class VectorStore:
         top_k: int,
     ) -> List[Dict[str, Any]]:
         return self.backend.search(query_embedding, top_k)
+
+    def list_documents(self) -> List[Dict[str, Any]]:
+        if hasattr(self.backend, "list_documents"):
+            return self.backend.list_documents()
+        return []
+
+    def delete_document(self, source_or_id: str) -> int:
+        if hasattr(self.backend, "delete_document"):
+            return self.backend.delete_document(source_or_id)
+        return 0
+
+    def get_stats(self) -> Dict[str, Any]:
+        if hasattr(self.backend, "get_stats"):
+            return self.backend.get_stats()
+        return {"backend": "unknown", "total_chunks": 0}
+
+    def clear(self) -> None:
+        if hasattr(self.backend, "clear"):
+            self.backend.clear()
+
 
 
 def _validate_embeddings(

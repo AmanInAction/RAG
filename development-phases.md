@@ -69,46 +69,52 @@ graph TD
 
 ## 3. Phased Implementation Roadmap
 
-### Phase 1: Core Engine Refactoring & Consolidation
+### Phase 1: Core Engine Refactoring & Consolidation (COMPLETED)
 **Goal**: Prepare the existing Python codebase to serve as an asynchronous, robust backend foundation.
-- [ ] **1.1 Dependency & Environment Standardization**:
+- [x] **1.1 Dependency & Environment Standardization**:
   - Add `fastapi`, `uvicorn[standard]`, `python-multipart`, `sse-starlette` to dependencies.
   - Sync `pyproject.toml` and lockfile using `uv`.
-- [ ] **1.2 LLM Streaming & Modern Gemini Client Integration**:
+- [x] **1.2 LLM Streaming & Modern Gemini Client Integration**:
   - Update [`src/llm.py`](file:///c:/Users/Asus/RAG/src/llm.py) to support both synchronous responses and asynchronous generator streaming (`stream_generate`).
   - Ensure compatibility with `google-genai` and `langchain-groq`.
-- [ ] **1.3 Document Registry & Store Management**:
+- [x] **1.3 Document Registry & Store Management**:
   - Enhance [`src/vector_store.py`](file:///c:/Users/Asus/RAG/src/vector_store.py) to support:
-    - Listing indexed documents and chunk statistics.
-    - Deleting all chunks belonging to a specific `source_file` or document ID.
-    - Index clearing and re-indexing capability.
-- [ ] **1.4 Dynamic Ingestion Loader**:
-  - Support single-file dynamic ingestion in memory or temporary storage for file uploads (PDF, TXT, MD, JSON) without requiring manual placement in `data/text_files`.
+    - Listing indexed documents and chunk statistics (`list_documents`, `get_stats`).
+    - Deleting all chunks belonging to a specific `source_file` or document ID (`delete_document`).
+    - Index clearing and re-indexing capability (`clear`).
+- [x] **1.4 Dynamic Ingestion Loader**:
+  - Support single-file dynamic ingestion in memory or temporary storage for file uploads (PDF, TXT, MD, JSON) via `load_single_file` and `load_single_url` without requiring manual placement in `data/text_files`.
+- [x] **1.5 Pipeline Streaming Interface**:
+  - Added `rag_stream` in [`src/pipeline.py`](file:///c:/Users/Asus/RAG/src/pipeline.py) returning metadata (sources, confidence, context) and real-time token generator for Server-Sent Events (SSE).
+
 
 ---
 
-### Phase 2: FastAPI Backend Engine
+### Phase 2: FastAPI Backend Engine (COMPLETED)
 **Goal**: Build a clean, scalable REST & Streaming API wrapping all RAG functionalities.
-- [ ] **2.1 Server Architecture & Lifespan**:
-  - Create `api/` package with `api/main.py`.
-  - Implement FastAPI lifespan: pre-warm `EmbeddingManager` and initialize `VectorStore` once at startup.
-  - Configure CORS middleware for Next.js frontend (`http://localhost:3000`).
-- [ ] **2.2 Document Management API Endpoints**:
+- [x] **2.1 Server Architecture & Lifespan**:
+  - Created `api/` package with [`api/main.py`](file:///c:/Users/Asus/RAG/api/main.py) and [`api/services.py`](file:///c:/Users/Asus/RAG/api/services.py).
+  - Implemented FastAPI `lifespan`: pre-warms `EmbeddingManager` and initializes `VectorStore` once at startup as singletons.
+  - Configured CORS middleware for Next.js frontend (`http://localhost:3000`).
+- [x] **2.2 Document Management API Endpoints**:
   - `POST /api/documents/upload`: Upload file(s) (`.pdf`, `.txt`, `.md`, `.json`) with optional chunking override parameters.
   - `POST /api/documents/url`: Ingest web pages dynamically from URL.
   - `GET /api/documents`: List all ingested documents, metadata, and chunk counts.
   - `DELETE /api/documents/{document_id}`: Remove a document and its chunks from vector storage.
   - `POST /api/documents/reindex`: Reindex all documents cleanly.
-- [ ] **2.3 Query & Streaming Chat Endpoints**:
+- [x] **2.3 Query & Streaming Chat Endpoints**:
   - `POST /api/chat/query`: Standard Q&A returning answer, sources, scores, confidence, and context.
-  - `POST /api/chat/stream`: Server-Sent Events (SSE) streaming the LLM token generation in real time with citations sent upon completion.
-- [ ] **2.4 Vector Store & Config Endpoints**:
+  - `POST /api/chat/stream`: Server-Sent Events (SSE) streaming LLM tokens in real time with metadata citations sent immediately.
+- [x] **2.4 Vector Store & Config Endpoints**:
   - `GET /api/config`: Current active provider, embedding model, vector store backend, and status.
   - `GET /api/vector-store/stats`: Total chunks, vector dimension, backend type, index health.
-- [ ] **2.5 Automated API Unit & Integration Tests**:
-  - Pytest / unittest suite testing endpoint contracts and mock workflows.
+  - `DELETE /api/vector-store/clear`: Purges indexed chunks.
+  - `GET /api/health`: Health check endpoint.
+- [x] **2.5 Automated API Unit & Integration Tests**:
+  - Unittest test suite [`tests/test_api.py`](file:///c:/Users/Asus/RAG/tests/test_api.py) covering all endpoints, returning 7/7 passing tests in 0.15s.
 
 ---
+
 
 ### Phase 3: Next.js (App Router) Frontend
 **Goal**: Build a stunning, responsive, and intuitive web application showcasing all RAG utilities.

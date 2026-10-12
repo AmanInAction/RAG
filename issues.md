@@ -1,77 +1,62 @@
-# Issues in this project
+# Project Issues & Resolution Status
 
-This project works in its configured virtual environment, but there are several project-level issues and risks that affect onboarding, reliability, and maintainability.
+This document tracks identified issues from the project audit and their resolution status across development phases.
 
-## 1) Python version mismatch and onboarding friction
+## Summary Matrix
 
-- The project declares `requires-python = ">=3.13"` in `pyproject.toml`, but the default shell environment here is using Python 3.11.
-- A plain `python -m unittest discover -s tests` fails with `ModuleNotFoundError: No module named 'numpy'` because the project dependencies are not installed in the system interpreter.
-- This means contributors must actively use the project venv (`.venv`) or a matching Python 3.13 environment; otherwise the project appears broken.
-- Evidence: `pyproject.toml`, `.python-version`, and the failed test run outside the venv.
+| Issue ID | Description | Status | Phase Resolved |
+| :--- | :--- | :--- | :--- |
+| **1** | Python version mismatch & onboarding friction | ⚠️ Workaround Documented | Use `.venv` or `uv run` |
+| **2** | Duplicate dependency management drift | ✅ **Resolved** | Phase 1 (`uv` sync across `pyproject.toml` and `requirements.txt`) |
+| **3** | Hard-coded demo query in `main.py` | ✅ **Resolved** | Phase 2 (FastAPI dynamic `/api/chat/query` & `/api/chat/stream`) |
+| **4** | Ingestion & embedding rebuild on every startup | ✅ **Resolved** | Phase 2 (Lifespan warm singleton & on-demand `/api/documents/upload`) |
+| **5** | No re-index or document-pruning workflow | ✅ **Resolved** | Phase 1 & 2 (`delete_document`, `list_documents`, `/api/documents/reindex`) |
+| **6** | Web ingestion limited to static text files | 🔄 **In Progress** | Dynamic single URL scraper added (`/api/documents/url`) |
+| **7** | Heavy ML libraries & operational complexity | ℹ️ Architecture Mitigated | Warm model singleton via FastAPI lifespan avoids reloads |
+| **8** | Tests lightweight / lacking integration coverage | ✅ **Improved** | Phase 2 added [`tests/test_api.py`](file:///c:/Users/Asus/RAG/tests/test_api.py) (7/7 tests passing) |
+| **9** | Lack of operational safeguards around config | ✅ **Resolved** | Phase 2 Pydantic schemas, `/api/health`, `/api/config` |
+| **10** | Prototype state without API or UI | 🔄 **In Progress** | Phase 2 (FastAPI API complete) -> Phase 3 (Next.js UI upcoming) |
 
-## 2) Duplicate dependency management creates inconsistent environments
+---
 
-- The repository has both `pyproject.toml` and `requirements.txt` listing dependencies, which can drift out of sync.
-- If a developer installs from one file and not the other, package versions and transitive dependencies can differ.
-- This increases onboarding and CI drift risk.
-- Evidence: both `pyproject.toml` and `requirements.txt` exist in the project root.
+## Detailed Issue Tracking
 
-## 3) The app is effectively a hard-coded demo, not a usable end-user application
+### 1) Python version mismatch and onboarding friction
+- **Status**: Mitigated via tooling.
+- **Resolution**: Environment managed via `uv`. Run all commands using `uv run` or activating `.venv`.
 
-- `main.py` runs a fixed example question (`"What is the purpose of ChatGPT?"`) instead of accepting user input.
-- There is no CLI for choosing a query, ingestion directory, or vector backend at runtime.
-- This limits real-world usage and makes the project feel like a prototype rather than a finished product.
-- Evidence: `main.py` and the README’s “Current Limitations” section.
+### 2) Duplicate dependency management
+- **Status**: ✅ **Resolved (Phase 1)**
+- **Resolution**: Both `pyproject.toml` and `requirements.txt` are synchronized and locked via `uv.lock`. Backend packages (`fastapi`, `uvicorn`, `python-multipart`, `sse-starlette`) were added consistently to both files.
 
-## 4) Ingestion and embedding run on every startup
+### 3) Hard-coded demo in `main.py`
+- **Status**: ✅ **Resolved (Phase 2)**
+- **Resolution**: Replaced the fixed execution model with a production-grade FastAPI backend offering `/api/chat/query` and real-time Server-Sent Events `/api/chat/stream`.
 
-- The pipeline rebuilds the index from source documents every time the app starts.
-- This is slow and wasteful for larger document sets and can become brittle when source files change.
-- It also increases startup time and makes local iteration slower.
-- Evidence: `main.py` and the README’s “Current Limitations”.
+### 4) Ingestion and embedding rebuild on every startup
+- **Status**: ✅ **Resolved (Phase 2)**
+- **Resolution**: Embeddings are persisted in the active vector store (Typesense or FAISS). FastAPI's lifespan initializes the store without re-indexing existing documents. Ingestion occurs on-demand via `/api/documents/upload` or `/api/documents/url`.
 
-## 5) No re-index or document-pruning workflow when sources change
+### 5) No re-index or document-pruning workflow
+- **Status**: ✅ **Resolved (Phase 1 & Phase 2)**
+- **Resolution**: Implemented `delete_document(source_or_id)` and `list_documents()` in [`VectorStore`](file:///c:/Users/Asus/RAG/src/vector_store.py), exposed as `GET /api/documents` and `DELETE /api/documents/{source_id}`. Added `POST /api/documents/reindex` for full directory re-indexing.
 
-- Changed or removed source documents are not automatically removed from the vector store.
-- This can cause stale data to remain searchable even after documents are deleted or edited.
-- This is a common RAG issue that affects trust in retrieved answers.
-- Evidence: README “Current Limitations”.
+### 6) Web ingestion limited to static pages
+- **Status**: 🔄 **In Progress (Phase 2 & Phase 3)**
+- **Resolution**: Added dynamic single-URL ingestion endpoint `/api/documents/url` in [`api/routes/documents.py`](file:///c:/Users/Asus/RAG/api/routes/documents.py).
 
-## 6) Web ingestion is limited to static pages and misses real-world web content
+### 7) Heavy dependencies & operational complexity
+- **Status**: ℹ️ **Architecture Mitigated**
+- **Resolution**: Model weights (`all-MiniLM-L6-v2`) are loaded once into memory on server startup via the [`RAGService`](file:///c:/Users/Asus/RAG/api/services.py) singleton, eliminating per-request latency.
 
-- `WebPageLoader` is documented as supporting static HTML pages, but not JavaScript-rendered or authenticated sites.
-- This means it will fail or underperform for web content that requires browser execution or login.
-- Evidence: `src/loaders.py` and README “Current Limitations”.
+### 8) Lightweight test coverage
+- **Status**: ✅ **Improved (Phase 2)**
+- **Resolution**: Added [`tests/test_api.py`](file:///c:/Users/Asus/RAG/tests/test_api.py) with full test coverage for API endpoints (chat query, document list, upload, deletion, vector stats, config, and health checks). All tests pass.
 
-## 7) The project relies on large ML libraries and external services, which increases operational complexity
+### 9) Lack of operational safeguards around missing configuration
+- **Status**: ✅ **Resolved (Phase 2)**
+- **Resolution**: Strict Pydantic request/response schemas in [`api/schemas.py`](file:///c:/Users/Asus/RAG/api/schemas.py). Clear validation errors returned via HTTP 400/500 with meaningful error messages.
 
-- Heavy dependencies such as `sentence-transformers`, `faiss-cpu`, `langchain`, and large model downloads are required for even basic use.
-- The app also requires external API keys for Gemini/Groq and optional Typesense configuration.
-- That increases setup cost, failure modes, and deployment complexity.
-- Evidence: `pyproject.toml`, `src/config.py`, and `src/llm.py`.
-
-## 8) Tests are lightweight and do not cover real runtime behavior or integration failures
-
-- The current tests mostly cover configuration and mock behavior, not end-to-end RAG execution against real documents and vector-store behavior.
-- There are no tests for prompt construction, retrieval thresholds, missing env vars, live API failures, or end-to-end answer quality.
-- This leaves reliability issues undetected.
-- Evidence: the tests under `tests/` and the README’s “Future Scope” section.
-
-## 9) Lack of operational safeguards around missing or invalid configuration
-
-- Missing API keys and misconfigured vector store settings raise runtime errors but there is no structured validation or user-friendly setup wizard.
-- This can lead to confusing failures during normal use.
-- Evidence: `src/llm.py`, `src/vector_store.py`, and the config-driven setup in the README.
-
-## 10) Project is a prototype, not yet a production-ready RAG system
-
-- The README explicitly lists the project’s current limitations and future scope, including missing CLI, reindexing, logging, retrieval evaluation, citations, and UI features.
-- The code is modular and promising, but it is still in an early-stage experimentation state.
-- Evidence: README “Current Limitations” and “Future Scope”.
-
-## Validation note
-
-- The project’s unit tests pass inside the repo’s virtual environment:
-  - Command: `./.venv/Scripts/python.exe -m unittest discover -s tests`
-  - Result: `OK` (10 tests)
-- The system Python outside the venv fails because the environment is not configured, which is itself an issue for reproducibility and onboarding.
+### 10) Prototype state without API or UI
+- **Status**: 🔄 **In Progress (Phase 2 Completed, Phase 3 Next)**
+- **Resolution**: FastAPI backend engine is fully operational with CORS and SSE streaming. Ready for Phase 3 (Next.js App Router frontend).
