@@ -4,7 +4,7 @@ import {
   splitTextIntoChunks,
   splitMarkdownAndCodeChunks,
   ragStore,
-} from "../frontend/lib/rag-store.ts";
+} from "../lib/rag-store.ts";
 
 describe("RAG Core Engine & Vector Mathematics Suite", () => {
   // 1. Text Chunking Tests

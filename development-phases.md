@@ -2,10 +2,10 @@
 
 ## 1. Executive Project Audit & Current State Analysis
 
-Based on our thorough audit of the repository and the issues documented in [`issues.md`](file:///c:/Users/Asus/RAG/issues.md), here is the assessment of the existing codebase:
+Based on our thorough audit of the repository and the issues documented in [`issues.md`](issues.md), here is the assessment of the existing codebase:
 
 ### 1.1 Core Strengths
-- **Modular Pipeline**: The codebase in [`src/`](file:///c:/Users/Asus/RAG/src) is cleanly separated into dedicated components: [`loaders.py`](file:///c:/Users/Asus/RAG/src/loaders.py), [`chunking.py`](file:///c:/Users/Asus/RAG/src/chunking.py), [`embeddings.py`](file:///c:/Users/Asus/RAG/src/embeddings.py), [`vector_store.py`](file:///c:/Users/Asus/RAG/src/vector_store.py), [`retriever.py`](file:///c:/Users/Asus/RAG/src/retriever.py), and [`llm.py`](file:///c:/Users/Asus/RAG/src/llm.py).
+- **Modular Pipeline**: The codebase in [`backend/src/`](backend/src) is cleanly separated into dedicated components: `loaders.py`, `chunking.py`, `embeddings.py`, `vector_store.py`, `retriever.py`, and `llm.py`.
 - **Dual Vector Store Backends**: Supports both cloud-ready **Typesense** and local persistent **FAISS** with cosine similarity.
 - **Multi-Model LLM Abstraction**: Supports Google Gemini and Groq (LLaMA 3.3).
 - **Deterministic Document IDs**: Both vector stores use SHA-256 content hashes to prevent duplicate ingestion of identical chunks.
@@ -16,7 +16,7 @@ Based on our thorough audit of the repository and the issues documented in [`iss
 | **Dependency & Runtime** | Dual dependency files (`pyproject.toml`, `requirements.txt`, managed via `uv`) + Python 3.13 requirement. | Confusing onboarding, potential version drift in deployments. | Standardize on `uv` & sync `pyproject.toml` with `requirements.txt`. |
 | **Execution Model** | `main.py` is a synchronous one-off script with a hardcoded query. Rebuilds embeddings on every run. | Heavy startup overhead, no interactive or API-based query capabilities. | Decouple ingestion from querying; introduce persistent vector store lifecycle in FastAPI. |
 | **Model Ingestion Lifecycle** | `SentenceTransformer` loads PyTorch weights into memory each time. | Heavy memory consumption and latency if reloaded per request. | Implement singleton model loading via FastAPI `lifespan` manager. |
-| **LLM Provider API Call** | `src/llm.py` uses `client.interactions.create` for Gemini, which can be brittle across `google-genai` versions, and lacks token streaming. | Inability to provide real-time typing responses in UI. | Standardize Gemini API client calls and add server-sent event (SSE) streaming. |
+| **LLM Provider API Call** | `backend/src/llm.py` uses `client.interactions.create` for Gemini, which can be brittle across `google-genai` versions, and lacks token streaming. | Inability to provide real-time typing responses in UI. | Standardize Gemini API client calls and add server-sent event (SSE) streaming. |
 | **Document State & Deletion** | No metadata tracking for files (file ID, date added, chunk counts) and no document pruning/deletion API. | Stale embeddings remain in index if files are modified or deleted. | Add Document Registry and document-level deletion/pruning in vector stores. |
 | **Lack of SaaS / API Layer** | No HTTP server, no CORS, no request validation, no progress tracking for large uploads. | Cannot be consumed by web frontends. | Build FastAPI REST API with Pydantic validation & background tasks. |
 | **No User Interface** | CLI/script only; no visualization of retrieved chunks, similarity scores, or document management. | Poor user experience. | Modern Next.js (App Router) interface with Dark/Light mode, Chat, Knowledge Base manager, and Playground. |
@@ -43,7 +43,7 @@ graph TD
         BgTasks["Background Ingestion Worker"]
     end
 
-    subgraph Core["Core RAG Engine (src/)"]
+    subgraph Core["Core RAG Engine (backend/src/)"]
         Loaders["loaders.py (PDF, TXT, MD, JSON, Web)"]
         Chunker["chunking.py (Recursive / Character)"]
         Embedder["embeddings.py (SentenceTransformer all-MiniLM-L6-v2)"]
@@ -75,17 +75,17 @@ graph TD
   - Add `fastapi`, `uvicorn[standard]`, `python-multipart`, `sse-starlette` to dependencies.
   - Sync `pyproject.toml` and lockfile using `uv`.
 - [x] **1.2 LLM Streaming & Modern Gemini Client Integration**:
-  - Update [`src/llm.py`](file:///c:/Users/Asus/RAG/src/llm.py) to support both synchronous responses and asynchronous generator streaming (`stream_generate`).
+  - Update [`backend/src/llm.py`](backend/src/llm.py) to support both synchronous responses and asynchronous generator streaming (`stream_generate`).
   - Ensure compatibility with `google-genai` and `langchain-groq`.
 - [x] **1.3 Document Registry & Store Management**:
-  - Enhance [`src/vector_store.py`](file:///c:/Users/Asus/RAG/src/vector_store.py) to support:
+  - Enhance [`backend/src/vector_store.py`](backend/src/vector_store.py) to support:
     - Listing indexed documents and chunk statistics (`list_documents`, `get_stats`).
     - Deleting all chunks belonging to a specific `source_file` or document ID (`delete_document`).
     - Index clearing and re-indexing capability (`clear`).
 - [x] **1.4 Dynamic Ingestion Loader**:
-  - Support single-file dynamic ingestion in memory or temporary storage for file uploads (PDF, TXT, MD, JSON) via `load_single_file` and `load_single_url` without requiring manual placement in `data/text_files`.
+  - Support single-file dynamic ingestion in memory or temporary storage for file uploads (PDF, TXT, MD, JSON) via `load_single_file` and `load_single_url` without requiring manual placement in `backend/data/text_files`.
 - [x] **1.5 Pipeline Streaming Interface**:
-  - Added `rag_stream` in [`src/pipeline.py`](file:///c:/Users/Asus/RAG/src/pipeline.py) returning metadata (sources, confidence, context) and real-time token generator for Server-Sent Events (SSE).
+  - Added `rag_stream` in [`backend/src/pipeline.py`](backend/src/pipeline.py) returning metadata (sources, confidence, context) and real-time token generator for Server-Sent Events (SSE).
 
 
 ---
@@ -93,7 +93,7 @@ graph TD
 ### Phase 2: FastAPI Backend Engine (COMPLETED)
 **Goal**: Build a clean, scalable REST & Streaming API wrapping all RAG functionalities.
 - [x] **2.1 Server Architecture & Lifespan**:
-  - Created `api/` package with [`api/main.py`](file:///c:/Users/Asus/RAG/api/main.py) and [`api/services.py`](file:///c:/Users/Asus/RAG/api/services.py).
+  - Created the [`backend/api/`](backend/api) package with `main.py` and `services.py`.
   - Implemented FastAPI `lifespan`: pre-warms `EmbeddingManager` and initializes `VectorStore` once at startup as singletons.
   - Configured CORS middleware for Next.js frontend (`http://localhost:3000`).
 - [x] **2.2 Document Management API Endpoints**:
@@ -111,7 +111,7 @@ graph TD
   - `DELETE /api/vector-store/clear`: Purges indexed chunks.
   - `GET /api/health`: Health check endpoint.
 - [x] **2.5 Automated API Unit & Integration Tests**:
-  - Unittest test suite [`tests/test_api.py`](file:///c:/Users/Asus/RAG/tests/test_api.py) covering all endpoints, returning 7/7 passing tests in 0.15s.
+  - Unittest test suite [`backend/tests/test_api.py`](backend/tests/test_api.py) covering all endpoints, returning 7/7 passing tests in 0.15s.
 
 ---
 
@@ -157,7 +157,7 @@ graph TD
   - Fast-failing web scraper timeouts (`AbortSignal.timeout(4000)`) preventing hanging threads on slow remote domains.
   - Resilient local grounded synthesis fallback ensuring zero downtime when LLM providers experience load or quota thresholds.
 - [x] **4.3 Verification & End-to-End Testing**:
-  - Comprehensive automated test suite in `tests/`: 44/44 passing tests across 13 suites in 3.5 seconds (`npm test`).
+  - Comprehensive automated test suite in `frontend/tests/`: 44/44 passing tests across 13 suites in 3.5 seconds (`npm test`).
   - Complete integration coverage of every REST API endpoint, streaming SSE token delivery, and session management.
   - Unit testing for vector algebra, cosine similarity, TF-IDF term hashing, and deduplication.
   - Frontend E2E coverage for navigation routing, parameter sliders, button clicks, file uploads, and session switches.

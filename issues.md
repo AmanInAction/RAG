@@ -55,7 +55,7 @@ This document tracks identified issues from the project audit and their resoluti
 
 ### 6) Web ingestion limited to static pages
 - **Status**: ✅ **Resolved (Phase 2 & Phase 3)**
-- **Resolution**: Added dynamic single-URL ingestion endpoint `/api/documents/url` in `api/routes/documents.py` and built the live URL ingestion card in the Next.js Knowledge Base Document Center with real-time status feedback.
+- **Resolution**: Added dynamic single-URL ingestion endpoint `/api/documents/url` in `backend/api/routes/documents.py` and built the live URL ingestion card in the Next.js Knowledge Base Document Center with real-time status feedback.
 
 ### 7) Heavy dependencies & operational complexity
 - **Status**: ℹ️ **Architecture Mitigated**
@@ -63,15 +63,15 @@ This document tracks identified issues from the project audit and their resoluti
 
 ### 8) Lightweight test coverage
 - **Status**: ✅ **Resolved (Phase 2 & Phase 3)**
-- **Resolution**: Created complete automated test suites in `tests/`:
-  - `tests/api_suite.test.ts`: 15 comprehensive integration tests covering all REST and SSE endpoints.
-  - `tests/rag_engine_suite.test.ts`: 8 unit tests covering chunk partitioning, vector dimensionality, and cosine similarity mathematics.
-  - `tests/frontend_e2e_suite.test.ts`: 13 end-to-end tests covering all UI workflows, navigation routing, buttons, and state changes.
+- **Resolution**: Created complete automated test suites in `frontend/tests/`:
+  - `frontend/tests/api_suite.test.ts`: 15 comprehensive integration tests covering all REST and SSE endpoints.
+  - `frontend/tests/rag_engine_suite.test.ts`: 8 unit tests covering chunk partitioning, vector dimensionality, and cosine similarity mathematics.
+  - `frontend/tests/frontend_e2e_suite.test.ts`: 13 end-to-end tests covering all UI workflows, navigation routing, buttons, and state changes.
   - All 36/36 tests passing in 3.1s via `npm test`.
 
 ### 9) Lack of operational safeguards around missing configuration
 - **Status**: ✅ **Resolved (Phase 2)**
-- **Resolution**: Strict Pydantic request/response schemas in `api/schemas.py`. Clear validation errors returned via HTTP 400/500 with meaningful error messages.
+- **Resolution**: Strict Pydantic request/response schemas in `backend/api/schemas.py`. Clear validation errors returned via HTTP 400/500 with meaningful error messages.
 
 ### 10) Prototype state without API or UI
 - **Status**: ✅ **Resolved (Phase 3)**

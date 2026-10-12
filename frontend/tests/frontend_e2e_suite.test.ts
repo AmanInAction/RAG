@@ -1,6 +1,6 @@
 import { test, describe, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { ragStore, splitTextIntoChunks } from "../frontend/lib/rag-store.ts";
+import { ragStore, splitTextIntoChunks } from "../lib/rag-store.ts";
 
 describe("Frontend End-to-End Workflow & Component Suite", () => {
   beforeEach(() => {

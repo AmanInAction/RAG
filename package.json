@@ -10,7 +10,7 @@
     "build": "npm run build --workspace=frontend",
     "start": "npm run start --workspace=frontend",
     "lint": "npm run lint --workspace=frontend",
-    "test": "TEST_OFFLINE_LLM=true tsx --test tests/*.test.ts"
+    "test": "TEST_OFFLINE_LLM=true tsx --test frontend/tests/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

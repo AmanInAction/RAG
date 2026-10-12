@@ -2,25 +2,25 @@ import { test, describe, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { NextRequest } from "next/server";
 
-import { GET as getHealth } from "../frontend/app/api/health/route.ts";
-import { GET as getConfig, POST as postConfig } from "../frontend/app/api/config/route.ts";
-import { GET as getStats } from "../frontend/app/api/vector-store/stats/route.ts";
-import { DELETE as clearStore } from "../frontend/app/api/vector-store/clear/route.ts";
-import { GET as getDocuments } from "../frontend/app/api/documents/route.ts";
-import { POST as uploadDocument } from "../frontend/app/api/documents/upload/route.ts";
-import { POST as ingestUrl } from "../frontend/app/api/documents/url/route.ts";
-import { POST as ingestBatchUrls } from "../frontend/app/api/documents/batch-urls/route.ts";
-import { DELETE as deleteDocument } from "../frontend/app/api/documents/[id]/route.ts";
-import { POST as reindexStore } from "../frontend/app/api/documents/reindex/route.ts";
-import { GET as getSessions, POST as createSession } from "../frontend/app/api/sessions/route.ts";
+import { GET as getHealth } from "../app/api/health/route.ts";
+import { GET as getConfig, POST as postConfig } from "../app/api/config/route.ts";
+import { GET as getStats } from "../app/api/vector-store/stats/route.ts";
+import { DELETE as clearStore } from "../app/api/vector-store/clear/route.ts";
+import { GET as getDocuments } from "../app/api/documents/route.ts";
+import { POST as uploadDocument } from "../app/api/documents/upload/route.ts";
+import { POST as ingestUrl } from "../app/api/documents/url/route.ts";
+import { POST as ingestBatchUrls } from "../app/api/documents/batch-urls/route.ts";
+import { DELETE as deleteDocument } from "../app/api/documents/[id]/route.ts";
+import { POST as reindexStore } from "../app/api/documents/reindex/route.ts";
+import { GET as getSessions, POST as createSession } from "../app/api/sessions/route.ts";
 import {
   GET as getSessionById,
   PUT as updateSessionById,
   DELETE as deleteSessionById,
-} from "../frontend/app/api/sessions/[id]/route.ts";
-import { POST as chatQuery } from "../frontend/app/api/chat/query/route.ts";
-import { POST as chatStream } from "../frontend/app/api/chat/stream/route.ts";
-import { ragStore } from "../frontend/lib/rag-store.ts";
+} from "../app/api/sessions/[id]/route.ts";
+import { POST as chatQuery } from "../app/api/chat/query/route.ts";
+import { POST as chatStream } from "../app/api/chat/stream/route.ts";
+import { ragStore } from "../lib/rag-store.ts";
 
 describe("RAG Platform End-to-End API Suite", () => {
   beforeEach(async () => {

@@ -9,4 +9,13 @@ wheels/
 # Virtual environments
 .venv
 .env
-data/faiss_store/
+
+# Backend runtime data
+backend/.env
+backend/data/faiss_store/
+
+# Frontend generated files
+frontend/.next/
+frontend/node_modules/
+frontend/coverage/
+frontend/next-env.d.ts
