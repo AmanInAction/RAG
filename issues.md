@@ -103,7 +103,7 @@ This document tracks identified issues from the project audit and their resoluti
 ### 14) Confidence Score Degradation with High Top-K Noise
 - **Discovery**: Simple arithmetic averaging of all retrieved chunks penalized confidence score when high values of `top_k` (e.g. 5–10) returned lower-scoring trailing chunks, even when the top chunk had high similarity (>0.75).
 - **Status**: ✅ **Resolved in Phase 3**
-- **Resolution**: Implemented a weighted confidence blend ($0.7 \times \text{top\_score} + 0.3 \times \text{avg\_score}$), ensuring strong primary matches preserve high confidence while still accounting for auxiliary context consistency.
+- **Resolution**: Implemented a weighted confidence blend ($0.7 \times \text{top\score} + 0.3 \times \text{avg\score}$), ensuring strong primary matches preserve high confidence while still accounting for auxiliary context consistency.
 
 ### 15) Cross-Workspace Test Runner Path Resolution
 - **Discovery**: Running TypeScript test suites from workspace root required proper path alias resolution for `@/*` imports and `next/server`.
@@ -118,7 +118,7 @@ This document tracks identified issues from the project audit and their resoluti
 ### 17) Multi-Stage Cross-Encoder Reranking
 - **Discovery**: Single-stage bi-encoder cosine similarity can occasionally suffer from lexical vs semantic nuance discrepancies on subtle queries.
 - **Status**: ✅ **Resolved in Phase 4**
-- **Resolution**: Implemented two-stage retrieval pipeline in `InMemoryRAGStore`: Stage 1 fetches top-20 candidate pool using vector cosine similarity and BM25 token boost; Stage 2 applies a cross-encoder model scoring exact sequence matching, query term density, and section header alignment ($0.55 \times \text{initial\_score} + 0.45 \times \text{lexical\_score}$). Exposes `rerank_delta` and `initial_score` telemetry on citations.
+- **Resolution**: Implemented two-stage retrieval pipeline in `InMemoryRAGStore`: Stage 1 fetches top-20 candidate pool using vector cosine similarity and BM25 token boost; Stage 2 applies a cross-encoder model scoring exact sequence matching, query term density, and section header alignment ($0.55 \times \text{initial\score} + 0.45 \times \text{lexical\score}$). Exposes `rerank_delta` and `initial_score` telemetry on citations.
 
 ### 18) AST-Aware Syntax Chunker for Markdown & Code
 - **Discovery**: Splitting Markdown or source code purely by character boundaries split mid-section, breaking context across header boundaries (`#`, `##`, `###`).
