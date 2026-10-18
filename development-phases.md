@@ -162,7 +162,7 @@ graph TD
   - Unit testing for vector algebra, cosine similarity, TF-IDF term hashing, and deduplication.
   - Frontend E2E coverage for navigation routing, parameter sliders, button clicks, file uploads, and session switches.
 - [x] **4.4 Advanced Retrieval & Ingestion Architecture (Issues 14, 16, 17, 18)**:
-  - **Issue 14**: Weighted confidence score blend ($0.7 \times \text{top\_score} + 0.3 \times \text{avg\_score}$) preventing score dilution on high top-k.
+  - **Issue 14**: Weighted confidence score blend ($0.7 \times \text{top-score} + 0.3 \times \text{avg-score}$) preventing score dilution on high top-k.
   - **Issue 16**: Batch URL ingestion endpoint (`POST /api/documents/batch-urls`) and tabbed UI for multi-URL web crawling.
   - **Issue 17**: Two-stage Cross-Encoder Reranker (`crossEncoderRerank`) computing lexical alignment, term density, and delta scores over top vector candidates.
   - **Issue 18**: AST-aware Markdown Header Chunker (`splitMarkdownAndCodeChunks`) preserving document heading hierarchies (`#`, `##`, `###`) and prepending contextual section headers.
