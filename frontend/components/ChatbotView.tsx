@@ -37,6 +37,8 @@ interface Message {
   isStreaming?: boolean;
 }
 
+const EMPTY_MESSAGES: Message[] = [];
+
 interface SessionItem {
   id: string;
   title: string;
@@ -77,7 +79,7 @@ export function ChatbotView({
     ],
   });
 
-  const messages = sessionHistories[activeSessionId] || [];
+  const messages = sessionHistories[activeSessionId] ?? EMPTY_MESSAGES;
 
   const [inputQuery, setInputQuery] = useState("");
   const [isLoading, setIsLoading] = useState(false);

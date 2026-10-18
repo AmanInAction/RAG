@@ -172,11 +172,92 @@ graph TD
 
 ---
 
-## 4. Phase Execution Summary
+## 4. Phase 5: Production Foundation & Stripe Billing (PLANNED)
+
+**Goal:** Turn the prototype into a secure, multi-user SaaS before accepting payments. Stripe must never be the only source of application state: the app stores its own user, workspace, subscription, entitlement, usage, and processed-webhook records in a durable database.
+
+### 5.0 Architecture decisions (do this first)
+
+- [ ] Choose one production API path. Recommended: keep Next.js for UI/API routes, move durable state to a database, and use Python only for RAG work. Do not use the in-memory `ragStore` as production state.
+- [ ] Choose an authentication provider and relational database with transactions and unique constraints.
+- [ ] Make billing workspace-based: a workspace owns documents, members, usage, one Stripe customer, and its subscription.
+- [ ] Define plans, included quotas, and overage behavior before creating Stripe Products and Prices. Store Stripe Price IDs in server-only environment variables; never accept an amount or arbitrary Price ID from the browser.
+
+### 5.1 Durable data model
+
+- [ ] Add migrations for `users`, `workspaces`, `workspace_members`, `documents`, `chat_sessions`, `chat_messages`, `subscriptions`, `entitlements`, `usage_counters`, and `stripe_events`.
+- [ ] Put `workspace_id` on every customer-data record, with foreign keys and indexes for ownership checks.
+- [ ] Add a unique constraint on `stripe_events.stripe_event_id` so webhook retries are safe.
+- [ ] Store a Stripe customer ID and subscription ID on the workspace/subscription record, never only in browser state.
+- [ ] Replace the in-memory `Map` state in `frontend/lib/rag-store.ts` with database-backed services. Make vector retrieval tenant-aware by enforcing `workspace_id` in every query.
+- [ ] Add a restart-persistence integration test: create a workspace and document, restart the application, then verify both remain available only to that workspace.
+
+### 5.2 Authentication, authorization, and quotas
+
+- [ ] Add sign-up, sign-in, sign-out, and session validation.
+- [ ] Require authentication for every customer-facing `/api/*` route. The only exception is the Stripe webhook endpoint.
+- [ ] Resolve the active workspace from the authenticated user; do not accept a user/workspace ID from the browser as authority.
+- [ ] Enforce membership and role checks for document upload/deletion, configuration, session access, reindexing, and vector-store clearing.
+- [ ] Scope destructive operations to a workspace and remove global customer-facing clear/reindex operations.
+- [ ] Add plan-based limits for document count, upload size, ingestion jobs, chat requests, and model tokens. Reject excess requests before starting an LLM or embedding call.
+- [ ] Add rate limits to auth, ingestion, and chat routes.
+
+### 5.3 Ingestion and platform hardening
+
+- [ ] Replace whole-file `arrayBuffer()` ingestion with streaming uploads and an explicit maximum size.
+- [ ] Validate file content/type, not only its filename extension. Scan or quarantine files if required by the deployment environment.
+- [ ] Protect URL ingestion against SSRF: allow `http`/`https` only, resolve DNS, block loopback/private/link-local/reserved IPs, re-check redirects, cap response size, and use short connect/read timeouts.
+- [ ] Run long ingestion as durable background jobs with status records instead of holding HTTP requests open.
+- [ ] Allow only the deployed frontend origin in CORS. Remove `*` and do not combine broad origins with credentials.
+- [ ] Add structured logs, request IDs, error reporting, health/readiness checks, backups, and secret rotation procedures.
+
+### 5.4 Stripe setup
+
+- [ ] Create Stripe Products and recurring Prices for each plan in test mode. Copy only their Price IDs into server-side environment variables.
+- [ ] Add server-only `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and plan Price IDs. A publishable key may use `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`; never expose secret or webhook keys.
+- [ ] Install Stripe's server SDK in the chosen API runtime.
+- [ ] Implement `POST /api/billing/checkout`: authenticate, load the workspace and existing Stripe customer, choose a Price ID from an allowlist, create a Checkout Session in `subscription` mode, and attach the immutable internal workspace ID as metadata/client reference.
+- [ ] Send an idempotency key when creating Checkout Sessions so a retry cannot create duplicate purchases.
+- [ ] Implement `POST /api/billing/portal`: authenticate, verify billing permission, and create a Stripe Customer Portal session for the stored customer ID.
+- [ ] Add pricing, upgrade, downgrade, cancellation, and billing-management UI. The success URL is informational only and must not grant paid access.
+
+### 5.5 Stripe webhooks and entitlements
+
+- [ ] Implement a dedicated webhook route that reads the unmodified raw body and verifies Stripe's signature using `STRIPE_WEBHOOK_SECRET` before processing it.
+- [ ] In one database transaction, insert the event ID into `stripe_events`, ignore duplicate IDs, update the subscription, and recompute workspace entitlement. Respond successfully only after the transaction commits.
+- [ ] Handle at minimum: `checkout.session.completed`, `customer.subscription.created`, `customer.subscription.updated`, `customer.subscription.deleted`, `invoice.paid`, and `invoice.payment_failed`.
+- [ ] Treat verified Stripe webhook state as authoritative. Explicitly model `trialing`, `active`, `past_due`, `unpaid`, `canceled`, and scheduled-cancellation behavior.
+- [ ] Check stored entitlement on every paid RAG, ingestion, and management request. Never trust a browser-supplied plan or redirect query parameter.
+- [ ] Create reconciliation tooling that fetches a Stripe customer/subscription and repairs local state if a webhook was missed.
+
+### 5.6 Test and release checklist
+
+- [ ] Test unauthenticated and cross-workspace access against every sensitive route.
+- [ ] Test persistence after restart, transaction rollback, and concurrent quota changes.
+- [ ] Test valid and invalid webhook signatures, duplicate and out-of-order events, and failed database transactions.
+- [ ] Use Stripe CLI and test-mode events for successful payment, card failure, cancellation, upgrade/downgrade, trial end, and Customer Portal updates.
+- [ ] Add deployed-like end-to-end tests; direct function-import tests are insufficient for billing.
+- [ ] Configure production webhooks, keep secrets server-only, alert on webhook failures, and document rollback/reconciliation.
+- [ ] Complete a security review before switching Stripe from test mode to live mode.
+
+### 5.7 Definition of done
+
+- [ ] A user can create or join a workspace and can see only that workspace's data.
+- [ ] Data and entitlements persist across restart, deploy, and multiple application instances.
+- [ ] Checkout retries cannot create duplicate subscriptions.
+- [ ] A forged webhook, browser-supplied plan, or success-page redirect cannot grant paid access.
+- [ ] Cancellation or failed payment reliably changes access through a verified Stripe webhook.
+- [ ] Ingestion cannot reach private network addresses or exhaust memory with an oversized upload.
+- [ ] The full Stripe lifecycle passes automated tests in test mode.
+
+---
+
+## 5. Phase Execution Summary
 | Phase | Focus | Key Deliverables | Status |
 | :--- | :--- | :--- | :--- |
 | **Phase 1** | Python Engine Modernization | Streaming LLM, document deletion in vector store, uv dependency alignment | ✅ COMPLETED |
 | **Phase 2** | FastAPI Backend | REST endpoints, SSE streaming, lifespan singleton, Pydantic schemas | ✅ COMPLETED |
 | **Phase 3** | Next.js Frontend | Modern UI, Chat with citations, Knowledge Base manager, Inspector playground | ✅ COMPLETED |
 | **Phase 4** | Integration & Polish | E2E testing (44/44 pass), multi-session chat, cross-encoder reranking, AST chunker, batch URLs | ✅ COMPLETED |
+| **Phase 5** | Production Foundation & Stripe Billing | Durable multi-tenant data, auth, quotas, security hardening, Stripe Checkout/webhooks/entitlements | PLANNED |
 

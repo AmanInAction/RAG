@@ -83,7 +83,6 @@ Embeddings are projected into a 384-dimensional space and indexed for approximat
     });
 
     test("applies keyword boost for direct token matches", () => {
-      const genericResults = ragStore.retrieve("fiction", 5, 0.1);
       const specificResults = ragStore.retrieve("Hunger Games Suzanne Collins", 5, 0.1);
 
       assert.ok(specificResults.length > 0);
