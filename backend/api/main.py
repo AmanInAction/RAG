@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from api.routes.chat import router as chat_router
 from api.routes.documents import router as documents_router
+from api.routes.evaluation import router as evaluation_router
 from api.routes.system import router as system_router
 from api.services import RAGService
 
@@ -26,12 +27,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(
     title="RAG SaaS Backend API",
-    description="Scalable FastAPI backend powering dynamic document ingestion, vector retrieval, and LLM streaming.",
-    version="0.1.0",
+    description="Scalable FastAPI backend powering document ingestion, vector retrieval, grounded generation, and evaluation.",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
-# Enable CORS for Next.js App Router (localhost:3000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -46,10 +46,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register API Routers
 app.include_router(chat_router)
 app.include_router(documents_router)
 app.include_router(system_router)
+app.include_router(evaluation_router)
 
 
 @app.get("/")
@@ -57,9 +57,10 @@ async def root():
     return JSONResponse(
         {
             "name": "RAG SaaS API",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "docs_url": "/docs",
             "health_url": "/api/health",
+            "evaluation_url": "/api/evaluation",
         }
     )
 
